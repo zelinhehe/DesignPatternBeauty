@@ -21,7 +21,8 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * 聚合统计：负责将原始数据聚合为统计数据，包括响应时间的最大值、最小值、平均值、99.9 百分位值、99 百分位值，以及接口请求的次数和 tps。
  * <p>
- * 显示：负责将统计数据以某种格式显示到终端，暂时只支持主动推送给命令行和邮件。命令行间隔 n 秒统计显示上 m 秒的数据（比如，间隔 60s 统计上 60s 的数据）。邮件每日统计上日的数据。
+ * 显示：负责将统计数据以某种格式显示到终端，暂时只支持主动推送给命令行和邮件。
+ * 命令行间隔 n 秒统计显示上 m 秒的数据（比如，间隔 60s 统计上 60s 的数据）。邮件每日统计上日的数据。
  */
 
 public class V1 {
@@ -44,7 +45,7 @@ public class V1 {
         collector.recordRequest(new RequestInfo("login", 1223, 14234));
 
         try {
-            Thread.sleep(100000);
+            Thread.sleep(1000 * 100);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -142,12 +143,9 @@ class Aggregator {
             avgRespTime = sumRespTime / count;
         }
         long tps = count / durationInMillis * 1000;
-        requestInfos.sort(new Comparator<RequestInfo>() {
-            @Override
-            public int compare(RequestInfo o1, RequestInfo o2) {
-                double diff = o1.getResponseTime() - o2.getResponseTime();
-                return Double.compare(diff, 0.0);
-            }
+        requestInfos.sort((o1, o2) -> {
+            double diff = o1.getResponseTime() - o2.getResponseTime();
+            return Double.compare(diff, 0.0);
         });
         int idx999 = (int) (count * 0.999);
         int idx99 = (int) (count * 0.99);
@@ -199,8 +197,8 @@ class ConsoleReporter {
                 long durationInMillis = durationInSeconds * 1000;
                 long endTimeInMillis = System.currentTimeMillis();
                 long startTimeInMillis = endTimeInMillis - durationInMillis;
-                Map<String, List<RequestInfo>> requestInfos =
-                        metricsStorage.getRequestInfos(startTimeInMillis, endTimeInMillis);
+                Map<String, List<RequestInfo>> requestInfos = metricsStorage.getRequestInfos(startTimeInMillis, endTimeInMillis);
+
                 Map<String, RequestStat> stats = new HashMap<>();
                 for (Map.Entry<String, List<RequestInfo>> entry : requestInfos.entrySet()) {
                     String apiName = entry.getKey();
@@ -257,8 +255,7 @@ class EmailReporter {
                 long durationInMillis = DAY_HOURS_IN_SECONDS * 1000;
                 long endTimeInMillis = System.currentTimeMillis();
                 long startTimeInMillis = endTimeInMillis - durationInMillis;
-                Map<String, List<RequestInfo>> requestInfos =
-                        metricsStorage.getRequestInfos(startTimeInMillis, endTimeInMillis);
+                Map<String, List<RequestInfo>> requestInfos = metricsStorage.getRequestInfos(startTimeInMillis, endTimeInMillis);
                 Map<String, RequestStat> stats = new HashMap<>();
                 for (Map.Entry<String, List<RequestInfo>> entry : requestInfos.entrySet()) {
                     String apiName = entry.getKey();
@@ -267,6 +264,9 @@ class EmailReporter {
                     stats.put(apiName, requestStat);
                 }
                 // TODO: 格式化为html格式，并且发送邮件
+                System.out.println("send mail Time Span: [" + startTimeInMillis + ", " + endTimeInMillis + "]");
+                Gson gson = new Gson();
+                System.out.println("send mail: " + gson.toJson(stats));
             }
         }, firstTime, DAY_HOURS_IN_SECONDS * 1000);
     }
